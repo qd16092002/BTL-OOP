@@ -1,0 +1,215 @@
+
+<!DOCTYPE html> 
+<html>
+<head>
+    
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.51.0/dist/phaser.js"></script>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Happy Hospital</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+</head>
+<body>
+    
+    <script>
+        
+        var config = {
+            type: Phaser.AUTO,
+            backgroundColor: "#777",
+            scale: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+            },
+            parent: 'phaser-example',
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            },
+            
+            dom: {
+                createContainer: true
+            },
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 }
+                }
+            }
+        };
+
+        var game = new Phaser.Game(config);
+        var player;
+        function preload ()
+        {
+
+            this.load.baseURL = "assets/";
+            this.load.image({
+                key: "tiles",
+                url: "tilemaps/tiles/hospital.png",
+            });
+            this.load.tilemapTiledJSON("hospital", "tilemaps/json/hospital.json");
+            this.load.image("agv", "sprites/agv.png");
+            this.load.spritesheet("tiles_spr", "tilemaps/tiles/hospital.png", {
+                frameWidth:32,
+                frameHeight: 32,
+            });
+            this.load.image("instruction", "sprites/instruction.png");
+            this.load.html("setNumAgentForm", "setNumAgents.html");
+            this.load.html("des", "des.html");
+        }
+
+        function create ()
+        {
+            
+            var map = this.make.tilemap({
+                key: "hospital",
+                tileHeight: 32,
+                tileWidth: 32,
+            });
+            var tileset = map.addTilesetImage("hospital", "tiles");
+            var noPathLayer = map.createLayer("nopath", tileset, 0, 0);
+            var groundLayer = map.createLayer("ground", tileset, 0, 0);
+            var roomLayer = map.createLayer("room", tileset, 0, 0);
+            var wallLayer = map.createLayer("wall", tileset, 0, 0);
+            var pathLayer = map.createLayer("path", tileset, 0, 0);
+            var doorLayer = map.createLayer("door", tileset, 0, 0);
+            var elevatorLayer = map.createLayer("elevator", tileset, 0, 0);
+            var gateLayer = map.createLayer("gate", tileset, 0, 0);
+            var bedLayer = map.createLayer("bed", tileset, 0, 0);
+            
+            noPathLayer.setCollisionByProperty({ collides: true });
+            roomLayer.setCollisionByProperty({ collides: true });
+            
+            var desDom = this.add.dom(1785, 600).createFromCache("des");
+            var setNumAgentsDOM = this.add.dom(1790, 220).createFromCache("setNumAgentForm");
+            var saveButton = this.add.text(window.innerWidth - 200, 50, "Save data", {
+                backgroundColor: "#eee",
+                padding: { bottom: 5, top: 5, left: 10, right: 10 },
+                color: "#000",
+                fontSize: "24px",
+                fontStyle: "bold",
+            });
+            var loadButton = this.add.text(window.innerWidth - 200, 110, "Load data", {
+                backgroundColor: "#eee",
+                padding: { bottom: 5, top: 5, left: 10, right: 10 },
+                color: "#000",
+                fontSize: "24px",
+                fontStyle: "bold",
+            });
+
+            saveButton
+                .setInteractive()
+                .on("pointerdown", () => handleClickSaveButton());
+            loadButton
+                .setInteractive()
+                .on("pointerdown", () => handleClickLoadButton());
+
+            var timeText = this.add.text(window.innerWidth - 190, 290, "00:00:00", {
+                color: "#D8202A",
+                fontSize: "28px",
+                fontStyle: "bold",
+            });
+
+            var timeTable = this.add.text(window.innerWidth - 1910, 870, "", {
+                color: "#D8202A",
+                fontSize: "28px",
+                fontStyle: "bold",
+            });
+            timeTable.setVisible(false);
+
+            var harmfulTable = this.add.text(window.innerWidth - 200, 320, "H.ness: 0",
+                {
+                    color: "#D8202A",
+                    fontSize: "28px",
+                    fontStyle: "bold",
+                }
+            );
+            
+            //this.add.image(100,200,"agv");
+            
+
+        }
+        function handleClickLoadButton() {
+
+        }
+        function handleClickSaveButton() {
+
+        }
+        
+        var map = {
+            "w" : false,
+            "s" : false,
+            "d" : false,
+            "a" : false
+        }; // You could also use an array
+
+       
+    
+        
+        
+        let socket = new WebSocket("ws://127.0.0.1:55555/");
+        socket.onopen = function(e) {
+            alert("[open] Connection established");
+        };
+        var i=0;
+        const actors = new Map();
+        
+        
+        function update () {
+            i++;
+            
+            console.log(1);
+            //console.log(i);
+            var game = this;
+            if (socket.readyState == 1) {
+                onkeydown = onkeyup = function(e){
+    e = e || event; // to deal with IE
+    map[e.key] = e.type == 'keydown';
+    console.log(map);
+}
+                socket.send(JSON.stringify(map));
+             
+            
+            socket.onmessage = function(event) {
+                
+                var jsonArray = JSON.parse(event.data);
+                //console.log(jsonArray.length);
+                jsonArray.forEach( item => {
+                    //console.log(item);
+                    
+                    if (actors.get(item.ID)==null) {
+                        if (item.isAgv == true) actor = game.physics.add.sprite(item.X,item.Y,"agv");
+                        else actor = game.physics.add.sprite(item.X,item.Y,"tiles_spr",17);
+                        actor.setOrigin(0,0);
+                        actors.set(item.ID,actor);
+
+                    }
+                    else {
+                        var actor = actors.get(item.ID);
+                        if (item.active == true) {
+                            actor.setX(item.X);
+                            actor.setY(item.Y);
+                        }
+                        else {
+                            actors.delete(item.ID);
+                            actor.destroy();
+                        }
+                    }
+                })
+            };
+        }
+        }
+       
+    </script>
+
+</body>
+</html>
+
